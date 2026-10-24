@@ -20,16 +20,40 @@ Jarvis is mijn persoonlijke AI-assistent voor het runnen van mijn bedrijf. Het i
 | Bol.com (via Rylee) | Verkoop, voorraad en advertenties op Bol |
 | Canva | Ontwerpen |
 
-## Status
+## Wat er al is
 
-Dit project staat aan het begin. Deze repo is de plek waar code, prompts, instructies en notities voor Jarvis samenkomen.
+Een spraakassistent in de browser, in de stijl van JARVIS uit Iron Man:
 
-## Structuur (voorstel)
+- **Praten en luisteren**: wake word "Hé Jarvis" of spatie om te praten (Chrome-spraakherkenning, `nl-NL`), typen met `T`.
+- **Antwoorden**: de server stuurt zinnen terug die meteen worden uitgesproken, met meelopende ondertitels. Onderbreken kan met spatie.
+- **Brein**: Claude Code op de Mac, met keuze tussen Haiku, Sonnet en Opus.
+- **Extra's**: optioneel zoeken op internet en Gmail (lezen + concepten).
+- **3D-avatar** met Three.js die reageert op luisteren, nadenken en praten.
+
+## Structuur
 
 ```
 jarvis/
-├── README.md        – dit bestand
-├── docs/            – ideeën, plannen en notities
-├── prompts/         – instructies en prompts voor Jarvis
-└── src/             – code en automatiseringen
+├── README.md
+└── web/
+    └── index.html     – interface (spraak, ondertitels, instellingen)
 ```
+
+### Nog toe te voegen
+
+De interface verwijst naar bestanden die nog niet in de repo staan:
+
+- `web/avatar3d.js` – de 3D-avatar
+- `web/lib/three/` – Three.js (kan ook van een CDN komen)
+- de server met de endpoints `/api/chat`, `/api/speak`, `/api/stop`, `/api/reset` en `/api/settings`
+- `start.command` – start de server op de Mac
+
+## Sneltoetsen
+
+| Toets | Actie |
+| --- | --- |
+| Spatie / klik | Praten of onderbreken |
+| T | Typen |
+| H | Knoppen verbergen |
+| S | Instellingen |
+| Esc | Stoppen |

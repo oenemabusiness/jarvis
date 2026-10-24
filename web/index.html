@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS</title>
+<script type="importmap">{ "imports": { "three": "./lib/three/build/three.module.js", "three/addons/": "./lib/three/addons/" } }</script>
+<style>
+  :root { --cyan: #7cc4ff; --gold: #ffb347; --bg: #03060f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; color: #e6f1ff;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  canvas { position: fixed; inset: 0; display: block; }
+
+  #status { position: fixed; right: 7%; top: 21%; font: 500 11px/1.6 "SF Mono", Menlo, monospace;
+    letter-spacing: .22em; color: var(--cyan); opacity: .85; text-shadow: 0 0 8px #2a8cff; white-space: pre; }
+  #sub { position: fixed; left: 50%; bottom: 13%; transform: translateX(-50%); width: min(90vw, 900px);
+    text-align: center; font-weight: 700; font-size: clamp(22px, 3.2vw, 40px); line-height: 1.25;
+    text-shadow: 0 2px 8px #000, 0 0 3px #000, 0 0 18px #000; pointer-events: none; min-height: 1.3em; }
+  #sub:not(:empty) { background: radial-gradient(ellipse at center, #000000b8 0%, #000000a0 45%, #00000000 75%);
+    padding: 14px 28px; border-radius: 40px; }
+  #sub .w { opacity: 0; transition: opacity .12s; }
+  #sub .w.on { opacity: 1; }
+  /* jouw spraak-naar-tekst: altijd zichtbaar, blijft staan tot je weer praat */
+  #you { position: fixed; left: 50%; bottom: 4.5%; transform: translateX(-50%); max-width: min(92vw, 1000px);
+    display: flex; align-items: baseline; gap: 12px; padding: 9px 20px; border-radius: 999px;
+    background: #050a14cc; border: 1px solid #1d3a5c; backdrop-filter: blur(6px);
+    font-size: clamp(15px, 1.6vw, 20px); font-weight: 600; color: #a8e4ff; pointer-events: none;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: border-color .2s, box-shadow .2s; }
+  #you b { font-size: 11px; letter-spacing: .28em; color: #5fb4dd; font-weight: 700; flex: none; }
+  #you span { overflow: hidden; text-overflow: ellipsis; }
+  #you.empty span { color: #5b7896; font-weight: 500; }
+  #you.live { border-color: #5fd0ff; box-shadow: 0 0 22px #2fb4ff44; }
+  #sub.err { color: #ff9a9a; font-size: 18px; font-weight: 500; }
+
+  #pill { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+    padding: 9px 18px 9px 14px; border-radius: 999px; background: #08112499; border: 1px solid #1d2b47;
+    backdrop-filter: blur(8px); font-size: 14px; letter-spacing: .02em; color: #b9cdee; white-space: nowrap; }
+  #pill .dot { width: 10px; height: 10px; border-radius: 50%; background: #56688a; flex: none; }
+  #pill.listen { border-color: #5fd0ff; color: #e8f8ff; box-shadow: 0 0 24px #2fb4ff55; }
+  #pill.listen .dot { background: #5fd0ff; box-shadow: 0 0 10px #5fd0ff; animation: blink .8s ease-in-out infinite; }
+  #pill.think { border-color: #8a5a1f; color: #ffe2b8; }
+  #pill.think .dot { background: #ffb347; animation: blink .5s ease-in-out infinite; }
+  #pill.speak { border-color: #a8692a; color: #ffe9c9; }
+  #pill.speak .dot { background: #ff9d3c; box-shadow: 0 0 8px #ff9d3c; }
+  #pill.off .dot { background: #ff6b6b; }
+  @keyframes blink { 50% { opacity: .25; transform: scale(.8); } }
+  .ui { transition: opacity .3s; }
+  body.clean .ui { opacity: 0; pointer-events: none; }
+  #hints { position: fixed; left: 18px; bottom: 16px; font-size: 12px; color: #7f93b5; letter-spacing: .02em; }
+  #hints b { color: #b9cdee; font-weight: 600; }
+  #gear { position: fixed; left: 16px; top: 16px; width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid #1d2b47; background: #0a1224cc; color: #9fb7dd; font-size: 18px; cursor: pointer; }
+  #panel { position: fixed; left: 16px; top: 64px; width: 300px; background: #0a1224f2; border: 1px solid #1d2b47;
+    border-radius: 14px; padding: 16px; display: none; font-size: 13px; }
+  #panel.open { display: block; }
+  #panel h3 { margin: 0 0 12px; font-size: 12px; letter-spacing: .18em; color: var(--cyan); }
+  #panel label { display: block; margin-bottom: 10px; color: #9fb7dd; }
+  #panel input[type=text], #panel select { width: 100%; margin-top: 4px; background: #050b18; color: #e6f1ff;
+    border: 1px solid #1d2b47; border-radius: 8px; padding: 7px 9px; font: inherit; }
+  #panel input[type=range] { width: 100%; }
+  #panel .row { display: flex; gap: 8px; margin-top: 12px; }
+  #panel button, #typebox button { flex: 1; background: #12203d; color: #e6f1ff; border: 1px solid #23365e;
+    border-radius: 8px; padding: 8px; font: inherit; cursor: pointer; }
+  #panel .chk { display: flex; gap: 8px; align-items: center; }
+  #panel small { color: #6c80a3; display: block; margin-top: 8px; line-height: 1.4; }
+  #typebox { position: fixed; left: 50%; bottom: 4%; transform: translateX(-50%); width: min(90vw, 620px);
+    display: none; gap: 8px; }
+  #typebox.open { display: flex; }
+  #typebox input { flex: 1; background: #050b18e6; color: #e6f1ff; border: 1px solid #23365e; border-radius: 10px;
+    padding: 11px 14px; font: inherit; font-size: 15px; }
+  #typebox button { flex: 0 0 auto; padding: 0 16px; }
+
+  #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: radial-gradient(circle at 50% 45%, #0b1838, #02040b 70%); cursor: pointer; z-index: 10; }
+  #boot .ring { width: 120px; height: 120px; border-radius: 50%; border: 1px solid #2f7dff;
+    box-shadow: 0 0 40px #1f6bff66, inset 0 0 30px #1f6bff44; animation: breathe 2.4s ease-in-out infinite; }
+  #boot p { margin: 0; letter-spacing: .32em; font-size: 13px; color: var(--cyan); }
+  #boot small { color: #6c80a3; letter-spacing: .05em; }
+  @keyframes breathe { 50% { transform: scale(1.08); box-shadow: 0 0 70px #1f6bffaa, inset 0 0 40px #1f6bff66; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="status">STATUS: OFFLINE</div>
+<div id="sub"></div>
+<div id="you" class="empty"><b>JIJ</b><span id="you-t">Hier verschijnt wat je zegt</span></div>
+<div id="pill" class="ui off"><span class="dot"></span><span id="pill-t">Offline</span></div>
+
+<button id="gear" class="ui" title="Instellingen (S)">⚙︎</button>
+<div id="panel" class="ui">
+  <h3>JARVIS · SETTINGS</h3>
+  <label>Stem <select id="s-voice"></select></label>
+  <label>Spreeksnelheid <span id="s-rate-v"></span><input type="range" id="s-rate" min="140" max="240" step="5"></label>
+  <label>Brein
+    <select id="s-model">
+      <option value="haiku">Haiku: het snelst</option>
+      <option value="sonnet">Sonnet: slim en snel</option>
+      <option value="opus">Opus: het slimst, trager</option>
+    </select></label>
+  <label>Naam assistent <input type="text" id="s-name"></label>
+  <label>Jouw naam <input type="text" id="s-user"></label>
+  <label class="chk"><input type="checkbox" id="s-wake"> Altijd luisteren naar “Hé <span class="nm">Jarvis</span>”</label>
+  <label class="chk"><input type="checkbox" id="s-web"> Mag op internet zoeken</label>
+  <label class="chk"><input type="checkbox" id="s-gmail"> Toegang tot Gmail (lezen + concepten)</label>
+  <div class="row"><button id="b-test">Test stem</button><button id="b-reset">Nieuw gesprek</button></div>
+  <small>Gratis betere stem: Systeeminstellingen → Toegankelijkheid → Gesproken materiaal → Systeemstem → Beheer stemmen → Nederlands → “Xander (Premium)”. Kies hem daarna hier.</small>
+</div>
+<div id="typebox" class="ui"><input id="typed" placeholder="Typ een bericht voor JARVIS…" autocomplete="off"><button id="b-send">Stuur</button></div>
+<div id="hints" class="ui">Zeg <b>“Hé Jarvis”</b> · <b>Spatie</b>/klik: praten · <b>T</b>: typen · <b>H</b>: knoppen verbergen · <b>S</b>: instellingen</div>
+
+<div id="boot"><div class="ring"></div><p>JARVIS STARTEN</p><small>Klik om te starten · sta de microfoon toe</small></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let S = {};                      // instellingen van de server
+let state = 'OFFLINE';           // OFFLINE · STANDBY · LISTENING · THINKING · SEARCHING · MAIL · SPEAKING
+let level = 0, targetLevel = 0;  // 0..1, stuurt de avatar
+
+/* ---- toestand zichtbaar en hoorbaar maken ---- */
+const vis = { listen: 0, think: 0, bright: 0.55 };
+let shownState = null;
+const PILL = {
+  OFFLINE:   ['off', 'Offline'],
+  STANDBY:   ['idle', () => S.wake ? `Zeg “Hé ${S.name || 'Jarvis'}” of druk op spatie` : 'Druk op spatie om te praten'],
+  LISTENING: ['listen', 'Ik luister: praat maar'],
+  THINKING:  ['think', 'Even nadenken…'],
+  SEARCHING: ['think', 'Zoeken op internet…'],
+  MAIL:      ['think', 'Mail doorzoeken…'],
+  SPEAKING:  ['speak', 'Aan het praten: spatie om te onderbreken'],
+};
+function refreshPill() {
+  const [cls, txt] = PILL[state] || PILL.STANDBY;
+  $('pill').className = 'ui ' + cls;
+  $('pill-t').textContent = typeof txt === 'function' ? txt() : txt;
+}
+function onStateChange(from, to) {
+  shownState = to;
+  refreshPill();
+  if (to === 'LISTENING') chime([660, 990]);                          // "ik luister"
+  else if (from === 'LISTENING' && to === 'THINKING') chime([990, 1320], 0.07);   // "begrepen"
+  else if (from === 'LISTENING' && to === 'STANDBY') chime([520, 350]);  // "gestopt, niets gehoord"
+}
+function chime(freqs, dur = 0.11) {
+  if (!ac) return;
+  freqs.forEach((f, i) => {
+    const o = ac.createOscillator(), gn = ac.createGain(), t0 = ac.currentTime + i * 0.09;
+    o.type = 'sine'; o.frequency.value = f;
+    gn.gain.setValueAtTime(0, t0);
+    gn.gain.linearRampToValueAtTime(0.1, t0 + 0.015);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.15);
+    o.connect(gn).connect(ac.destination);
+    o.start(t0); o.stop(t0 + dur + 0.2);
+  });
+}
+
+/* =====================================================================
+   TOESTAND PER FRAME — avatar3d.js roept tick() elk frame aan en leest
+   daarna `state`, `level` en `vis` uit om de 3D-avatar te sturen.
+   ===================================================================== */
+let tickFrame = 0;
+function tick(now) {
+  const t = now / 1000;
+  // niveau: echte audio tijdens praten/luisteren, rustige ademhaling in stand-by
+  targetLevel = state === 'SPEAKING' ? speakLevel() : state === 'LISTENING' ? micLevel()
+              : state === 'THINKING' || state === 'SEARCHING' || state === 'MAIL' ? 0.18 + 0.1 * Math.sin(t * 4) : 0.06 + 0.03 * Math.sin(t * 1.3);
+  level += (targetLevel - level) * (targetLevel > level ? 0.35 : 0.12);
+
+  const thinking = state === 'THINKING' || state === 'SEARCHING' || state === 'MAIL';
+  vis.listen += ((state === 'LISTENING' ? 1 : 0) - vis.listen) * 0.18;
+  vis.think += ((thinking ? 1 : 0) - vis.think) * 0.12;
+  vis.bright += ((state === 'STANDBY' || state === 'OFFLINE' ? 0.55 : 1) - vis.bright) * 0.08;
+  if (state !== shownState) onStateChange(shownState, state);
+
+  if (++tickFrame % 6 === 0) {
+    const inten = level < 0.22 ? 'LAAG' : level < 0.5 ? 'MIDDEL' : 'HOOG';
+    const label = { OFFLINE: 'OFFLINE', STANDBY: 'STAND-BY', LISTENING: 'LUISTERT', THINKING: 'DENKT NA', SEARCHING: 'ZOEKT', MAIL: 'LEEST MAIL', SPEAKING: 'PRAAT' }[state] || state;
+    $('status').textContent = `STATUS: ${label}  INTENSITEIT: ${inten}`;
+  }
+}
+
+
+/* =====================================================================
+   AUDIO — stem afspelen via WebAudio (voor echte reactie) + microfoon-niveau
+   ===================================================================== */
+let ac, speakAn, micAn, micBuf, spkBuf, currentSrc = null;
+async function initAudio() {
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  speakAn = ac.createAnalyser(); speakAn.fftSize = 1024; speakAn.connect(ac.destination);
+  spkBuf = new Float32Array(speakAn.fftSize);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    micAn = ac.createAnalyser(); micAn.fftSize = 1024; micBuf = new Float32Array(micAn.fftSize);
+    ac.createMediaStreamSource(stream).connect(micAn);
+  } catch (e) { showError('Microfoon geblokkeerd. Sta hem toe in Chrome om met JARVIS te praten (typen met T kan altijd).'); }
+}
+function rms(an, buf) { if (!an) return 0; an.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); }
+let speakLevel = () => Math.min(1, rms(speakAn, spkBuf) * 5.5);
+const micLevel = () => Math.min(1, 0.12 + rms(micAn, micBuf) * 9);
+
+/* =====================================================================
+   ONDERTITELS
+   ===================================================================== */
+let subTimers = [];
+function clearSub() { subTimers.forEach(clearTimeout); subTimers = []; $('sub').className = ''; $('sub').innerHTML = ''; }
+// jouw tekst staat in een eigen regel die niet door JARVIS' ondertitels wordt weggehaald
+function showUserText(text, live = false) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return;
+  $('you-t').textContent = (words.length > 18 ? '… ' : '') + words.slice(-18).join(' ');
+  $('you').className = live ? 'live' : '';
+}
+function showError(msg) { clearSub(); $('sub').className = 'err'; $('sub').textContent = msg; }
+// toon de woorden van een zin in blokjes van max. 5, getimed over de duur van de audio
+function karaoke(text, duration) {
+  clearSub();
+  const words = text.split(/\s+/).filter(Boolean);
+  const weights = words.map(w => 1 + w.length * 0.35), total = weights.reduce((a, b) => a + b, 0);
+  let tAcc = 0;
+  const chunks = [];
+  for (let i = 0; i < words.length; i += 5) chunks.push(words.slice(i, i + 5));
+  let idx = 0;
+  chunks.forEach((chunk, ci) => {
+    const startAt = tAcc;
+    subTimers.push(setTimeout(() => { $('sub').innerHTML = chunk.map(w => `<span class="w">${w.replace(/</g, '&lt;')} </span>`).join(''); }, startAt * 1000));
+    chunk.forEach((w, wi) => {
+      const at = tAcc; const myIdx = wi;
+      subTimers.push(setTimeout(() => { const el = $('sub').children[myIdx]; if (el) el.classList.add('on'); }, at * 1000));
+      tAcc += duration * weights[idx++] / total;
+    });
+  });
+}
+
+/* =====================================================================
+   PRATEN — server stuurt zinnen, elke zin wordt meteen omgezet naar audio
+   ===================================================================== */
+let queue = [], playing = false, streamDone = true, chatCtrl = null;
+
+function setState(s) { state = s; if (s === 'STANDBY' || s === 'THINKING') startOrStopRecognition(); }
+
+async function fetchSpeech(text) {
+  const res = await fetch('/api/speak', { method: 'POST', body: JSON.stringify({ text }) });
+  if (!res.ok) throw new Error('voice failed');
+  return ac.decodeAudioData(await res.arrayBuffer());
+}
+function enqueue(text) { queue.push({ text, audio: fetchSpeech(text).catch(() => null) }); if (!playing) playNext(); }
+
+async function playNext() {
+  if (!queue.length) {
+    playing = false;
+    if (streamDone && state === 'SPEAKING') { setState('STANDBY'); setTimeout(() => { if (state === 'STANDBY') clearSub(); }, 2500); }
+    return;
+  }
+  playing = true;
+  const item = queue.shift();
+  const buf = await item.audio;
+  if (!buf || !playing) return playNext();
+  stopRecognition();
+  state = 'SPEAKING';
+  const src = ac.createBufferSource(); src.buffer = buf; src.connect(speakAn);
+  currentSrc = src;
+  karaoke(item.text, buf.duration);
+  src.onended = () => { if (currentSrc === src) { currentSrc = null; playNext(); } };
+  src.start();
+}
+
+function interrupt() {
+  queue = []; playing = false; streamDone = true;
+  if (currentSrc) { try { currentSrc.stop(); } catch (e) {} currentSrc = null; }
+  clearSub();
+  if (chatCtrl) { chatCtrl.abort(); chatCtrl = null; return fetch('/api/stop', { method: 'POST' }).catch(() => {}); }
+}
+
+async function ask(text) {
+  text = text.trim(); if (!text) return setState('STANDBY');
+  await interrupt();
+  showUserText(text);
+  setState('THINKING'); streamDone = false;
+  chatCtrl = new AbortController();
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({ text }), signal: chatCtrl.signal });
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+        if (!line.trim()) continue;
+        const msg = JSON.parse(line);
+        if (msg.type === 'sentence') enqueue(msg.text);
+        else if (msg.type === 'status' && ['THINKING', 'SEARCHING', 'MAIL'].includes(state)) state = msg.status;
+        else if (msg.type === 'error') { showError(msg.text); setState('STANDBY'); }
+      }
+    }
+  } catch (e) { if (e.name !== 'AbortError') { showError('Verbinding verbroken: ' + e.message); setState('STANDBY'); } }
+  chatCtrl = null; streamDone = true;
+  if (!playing && !queue.length && state !== 'STANDBY') setState('STANDBY');
+}
+
+/* =====================================================================
+   LUISTEREN — Chrome-spraakherkenning, met "Hey Jarvis" wake word
+   ===================================================================== */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recOn = false, segStart = -1, cmdTimer = null, listenTimeout = null, pushToTalk = false;
+
+function wakeRegex() {
+  const w = (S.wake_word || 'jarvis').toLowerCase().replace(/[^a-z]/g, '');
+  const alts = w === 'jarvis' ? 'jarvis|jervis|charvis|javis|jarvas|jarvies|jarves|tsjarvis' : w;
+  return new RegExp(`\\b(?:hey|hé|he|hee|hoi|hi|okay|ok|yo|hallo)?[\\s,]*(?:${alts})\\b[\\s,.!?]*`, 'i');
+}
+
+function setupRecognition() {
+  if (!SR) { showError('Praten werkt alleen in Google Chrome. Typen met T kan altijd.'); return; }
+  rec = new SR();
+  rec.continuous = true; rec.interimResults = true; rec.lang = S.lang || 'nl-NL';
+  rec.onresult = e => {
+    const wake = wakeRegex();
+    // nog geen opdracht bezig: zoek het wake word
+    if (state !== 'LISTENING') {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (wake.test(e.results[i][0].transcript)) { startListening(i); break; }
+      }
+      if (state !== 'LISTENING') return;
+    }
+    let text = '', final = true;
+    for (let i = segStart; i < e.results.length; i++) {
+      let part = e.results[i][0].transcript;
+      if (i === segStart && !pushToTalk) part = part.replace(wake, ' ');
+      text += part;
+      if (!e.results[i].isFinal) final = false;
+    }
+    text = text.trim();
+    if (text) { showUserText(text, true); clearTimeout(listenTimeout); }
+    clearTimeout(cmdTimer);
+    if (text) cmdTimer = setTimeout(() => finishListening(text), final ? 250 : 1600);
+  };
+  rec.onend = () => { recOn = false; startOrStopRecognition(); };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed') showError('Microfoon geblokkeerd. Sta hem toe in Chrome (slotje in de adresbalk).');
+    else if (e.error === 'network') showError('Spraakherkenning heeft een internetverbinding nodig.');
+  };
+}
+
+function startListening(resultIndex) {
+  $('you-t').textContent = 'Ik luister…'; $('you').className = 'live empty';
+  segStart = resultIndex;
+  state = 'LISTENING';
+  clearSub();
+  clearTimeout(listenTimeout);
+  listenTimeout = setTimeout(() => { if (state === 'LISTENING') { setState('STANDBY'); clearSub(); } }, 7000);
+}
+function finishListening(text) {
+  clearTimeout(cmdTimer); clearTimeout(listenTimeout);
+  pushToTalk = false;
+  stopRecognition();
+  ask(text);
+}
+
+function shouldRecognize() { return rec && ac && (state === 'LISTENING' || (state === 'STANDBY' && S.wake)); }
+function startOrStopRecognition() {
+  if (!rec) return;
+  if (shouldRecognize() && !recOn) { try { rec.start(); recOn = true; } catch (e) {} }
+  else if (!shouldRecognize() && recOn) stopRecognition();
+}
+function stopRecognition() { if (rec && recOn) { try { rec.abort(); } catch (e) {} recOn = false; } }
+
+// spatie / klik: direct luisteren (of onderbreken als hij praat)
+function talk() {
+  if (!ac) return;
+  if (state === 'SPEAKING' || state === 'THINKING' || state === 'SEARCHING' || state === 'MAIL') { interrupt(); setState('STANDBY'); }
+  if (state === 'LISTENING') { setState('STANDBY'); clearSub(); return; }
+  pushToTalk = true;
+  stopRecognition();
+  // na een herstart begint de herkenning weer bij resultaat 0
+  setTimeout(() => { startListening(0); try { rec.start(); recOn = true; } catch (e) {} }, 120);
+}
+
+/* =====================================================================
+   INSTELLINGEN, TOETSEN, OPSTARTEN
+   ===================================================================== */
+async function loadSettings() {
+  const r = await (await fetch('/api/settings')).json();
+  S = r.settings;
+  const sel = $('s-voice');
+  sel.innerHTML = r.voices.map(v => `<option value="${v.name}">${v.name} (${v.lang})</option>`).join('');
+  sel.value = S.voice;
+  $('s-rate').value = S.rate; $('s-rate-v').textContent = S.rate;
+  $('s-model').value = S.model; $('s-name').value = S.name; $('s-user').value = S.user;
+  $('s-wake').checked = !!S.wake; $('s-web').checked = !!S.web; $('s-gmail').checked = !!S.gmail;
+  document.querySelectorAll('.nm').forEach(e => e.textContent = S.name);
+  refreshPill();
+  if (!r.claude) showError('Claude Code is niet gevonden op deze Mac.');
+}
+async function saveSettings() {
+  const body = { voice: $('s-voice').value, rate: +$('s-rate').value, model: $('s-model').value,
+    name: $('s-name').value.trim() || 'JARVIS', user: $('s-user').value.trim() || 'Max',
+    wake: $('s-wake').checked, web: $('s-web').checked, gmail: $('s-gmail').checked, wake_word: ($('s-name').value.trim() || 'jarvis').toLowerCase() };
+  S = (await (await fetch('/api/settings', { method: 'POST', body: JSON.stringify(body) })).json()).settings;
+  $('s-rate-v').textContent = S.rate;
+  document.querySelectorAll('.nm').forEach(e => e.textContent = S.name);
+  refreshPill();
+  startOrStopRecognition();
+}
+['s-voice', 's-rate', 's-model', 's-name', 's-user', 's-wake', 's-web', 's-gmail'].forEach(id => $(id).addEventListener('change', saveSettings));
+$('s-rate').addEventListener('input', () => $('s-rate-v').textContent = $('s-rate').value);
+$('gear').onclick = e => { e.stopPropagation(); $('panel').classList.toggle('open'); };
+$('panel').onclick = e => e.stopPropagation();
+$('typebox').onclick = e => e.stopPropagation();
+$('b-test').onclick = () => { interrupt(); streamDone = true; enqueue(`Goed je te zien, ${S.user}. Zo klink ik.`); };
+$('b-reset').onclick = async () => { interrupt(); await fetch('/api/reset', { method: 'POST' }); setState('STANDBY'); enqueue('Geheugen gewist. We beginnen opnieuw.'); };
+$('b-send').onclick = () => { const v = $('typed').value; $('typed').value = ''; ask(v); };
+$('typed').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('b-send').click(); if (e.key === 'Escape') $('typebox').classList.remove('open'); });
+['s-name', 's-user'].forEach(id => $(id).addEventListener('keydown', e => e.stopPropagation()));
+
+document.addEventListener('keydown', e => {
+  if (!ac) return;
+  if (e.code === 'Space') { e.preventDefault(); talk(); }
+  else if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('clean');
+  else if (e.key === 's' || e.key === 'S') $('panel').classList.toggle('open');
+  else if (e.key === 't' || e.key === 'T') { e.preventDefault(); $('typebox').classList.add('open'); $('typed').focus(); }
+  else if (e.key === 'Escape') { interrupt(); setState('STANDBY'); $('panel').classList.remove('open'); }
+});
+$('c').addEventListener('click', () => { $('panel').classList.remove('open'); talk(); });
+
+$('boot').onclick = async () => {
+  $('boot').style.display = 'none';
+  await initAudio();
+  setupRecognition();
+  setState('STANDBY');
+  const h = new Date().getHours();
+  const part = h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond';
+  streamDone = true;
+  enqueue(`${part}, ${S.user}. Alle systemen zijn online.`);
+};
+
+// ?preview=SPEAKING (of LISTENING/THINKING) toont de avatar zonder opstartscherm — handig om te testen
+const preview = new URLSearchParams(location.search).get('preview');
+if (preview) { $('boot').style.display = 'none'; state = preview.toUpperCase(); speakLevel = () => 0.55 + 0.4 * Math.sin(performance.now() / 90); }
+const previewSay = new URLSearchParams(location.search).get('say');
+if (previewSay) showUserText(previewSay);
+
+loadSettings().catch(() => showError('Kan de JARVIS-server niet bereiken. Start hem met start.command.'));
+</script>
+<script type="module" src="avatar3d.js?v=2"></script>
+</body>
+</html>
