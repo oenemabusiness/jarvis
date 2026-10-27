@@ -27,7 +27,7 @@ Een spraakassistent in de browser, in de stijl van JARVIS uit Iron Man:
 - **Praten en luisteren**: wake word "Hé Jarvis" of spatie om te praten (Chrome-spraakherkenning, `nl-NL`), typen met `T`.
 - **Antwoorden**: de server stuurt zinnen terug die meteen worden uitgesproken, met meelopende ondertitels. Onderbreken kan met spatie.
 - **Persoonlijkheid**: een Britse butler zoals JARVIS uit Iron Man. Hij praat Engels en verstaat Nederlands. Aanpassen kan in `server/prompts/jarvis.md`.
-- **Brein**: Claude via de Anthropic API, met keuze tussen Haiku, Sonnet en Opus.
+- **Brein**: Claude Code met je Claude-abonnement (Pro/Max), met keuze tussen Haiku, Sonnet en Opus. Een betaalde API-sleutel kan ook (`JARVIS_BRAIN=api` in `.env`).
 - **Stem**: ElevenLabs als er een sleutel in `.env` staat, anders de macOS-stem "Daniel" (Brits).
 - **Extra's**: optioneel zoeken op internet. Gmail en Agenda volgen in fase 3 van het plan.
 - **3D-avatar** met Three.js die reageert op luisteren, nadenken en praten.
@@ -35,9 +35,8 @@ Een spraakassistent in de browser, in de stijl van JARVIS uit Iron Man:
 ## Starten op de Mac
 
 1. Installeer [Node.js](https://nodejs.org) (LTS) als je dat nog niet hebt.
-2. Dubbelklik `start.command`. De eerste keer maakt hij een `.env`-bestand aan.
-3. Zet je `ANTHROPIC_API_KEY` in `.env` (en eventueel `ELEVENLABS_API_KEY`) en dubbelklik opnieuw.
-4. Chrome opent op `http://localhost:8765`. Klik om te starten en sta de microfoon toe.
+2. Dubbelklik `start.command`. De eerste keer installeert hij Claude Code en vraagt hij je in te loggen met je Claude-account.
+3. Chrome opent op `http://localhost:8765`. Klik om te starten en sta de microfoon toe.
 
 Sleutels staan alleen in `.env`, en dat bestand gaat nooit mee de repo in.
 

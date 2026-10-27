@@ -8,7 +8,8 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
@@ -28,7 +29,14 @@ if (fs.existsSync(envFile)) {
 }
 const PORT = +process.env.PORT || 8765;
 const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY || '';
-const HAS_CLAUDE = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+const HAS_KEY = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+
+// Claude Code op deze Mac gebruikt je Claude-abonnement (Pro/Max): dan is geen betaalde API-sleutel nodig
+const CLAUDE_BIN = [process.env.CLAUDE_BIN, path.join(os.homedir(), '.local/bin/claude'), path.join(os.homedir(), '.claude/local/claude'),
+  '/opt/homebrew/bin/claude', '/usr/local/bin/claude'].find(p => p && fs.existsSync(p));
+// voorkeur: het abonnement; JARVIS_BRAIN=api in .env kiest de betaalde sleutel
+const BRAIN = process.env.JARVIS_BRAIN === 'api' && HAS_KEY ? 'api' : CLAUDE_BIN ? 'abonnement' : HAS_KEY ? 'api' : null;
+const HAS_CLAUDE = !!BRAIN;
 
 /* ---- instellingen, bewaard in data/settings.json ---- */
 const DEFAULTS = { voice: 'Daniel', rate: 185, model: 'opus', name: 'JARVIS', user: 'sir',
@@ -91,7 +99,7 @@ async function speak(text) {
 /* =====================================================================
    BREIN — Claude, met geheugen per gesprek en zinnen die meteen gestreamd worden
    ===================================================================== */
-const claude = HAS_CLAUDE ? new Anthropic() : null;
+const claude = BRAIN === 'api' ? new Anthropic() : null;
 let history = [];
 let current = null;   // lopende stream, zodat /api/stop hem kan afbreken
 
@@ -104,13 +112,10 @@ function systemPrompt() {
 // spreektekst: markdown en links eruit, zodat de stem niets raars voorleest
 const clean = t => t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, '').replace(/[*_#`>]+/g, '').replace(/^\s*[-•]\s+/gm, '').replace(/\s+/g, ' ').trim();
 
-async function chat(userMsg, send) {
-  history.push(userMsg);
-  const model = MODELS[S.model] || MODELS.opus;
-  const tools = S.web ? [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }] : undefined;
+// stuurt elke afgeronde zin direct door, zodat Jarvis al praat terwijl Claude nog schrijft
+function sentenceStream(send) {
   let pending = '';
   const flush = (all) => {
-    // stuur elke afgeronde zin direct door, zodat Jarvis al praat terwijl Claude nog schrijft
     const re = all ? /^[\s\S]+$/ : /^[\s\S]*?[.!?…](?=\s)/;
     let m;
     while ((m = pending.match(re))) {
@@ -119,6 +124,20 @@ async function chat(userMsg, send) {
       if (all) break;
     }
   };
+  return {
+    add(t) { pending += t; flush(false); },
+    gap() { if (pending && !/\s$/.test(pending)) pending += ' '; },
+    drop() { pending = ''; },
+    end() { flush(true); },
+  };
+}
+
+/* ---- via de Anthropic API (betaalde sleutel) ---- */
+async function chatApi(userMsg, send) {
+  history.push(userMsg);
+  const model = MODELS[S.model] || MODELS.opus;
+  const tools = S.web ? [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }] : undefined;
+  const out = sentenceStream(send);
 
   for (let round = 0; round < 4; round++) {
     const params = {
@@ -131,16 +150,65 @@ async function chat(userMsg, send) {
       : claude.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
     for await (const ev of stream) {
       if (ev.type === 'content_block_start' && ev.content_block.type === 'server_tool_use') send({ type: 'status', status: 'SEARCHING' });
-      if (ev.type === 'content_block_start' && ev.content_block.type === 'text' && pending && !/\s$/.test(pending)) pending += ' ';
-      if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') { pending += ev.delta.text; flush(false); }
+      if (ev.type === 'content_block_start' && ev.content_block.type === 'text') out.gap();
+      if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') out.add(ev.delta.text);
     }
     const msg = await stream.finalMessage();
     history.push({ role: 'assistant', content: msg.content });
-    if (msg.stop_reason === 'refusal') { pending = ''; send({ type: 'sentence', text: "I'm afraid I can't help with that one, sir." }); break; }
+    if (msg.stop_reason === 'refusal') { out.drop(); send({ type: 'sentence', text: "I'm afraid I can't help with that one, sir." }); break; }
     if (msg.stop_reason !== 'pause_turn') break;   // web search wil nog een ronde
   }
-  flush(true);
+  out.end();
 }
+
+/* ---- via Claude Code op de Mac (je Claude-abonnement) ---- */
+let ccSession = null;   // gesprek dat Claude Code onthoudt tussen vragen
+function chatCode(userMsg, send) {
+  return new Promise((resolve, reject) => {
+    const first = !ccSession;
+    if (first) ccSession = randomUUID();
+    // korte herinnering per vraag: kleine modellen schieten anders mee in het Nederlands
+    const args = ['-p', `${userMsg.content}\n\n(Reply in British English.)`, '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+      '--model', MODELS[S.model] ? S.model : 'sonnet', '--system-prompt', systemPrompt(), '--system-prompt-snapshot', 'off', '--strict-mcp-config',
+      '--tools', S.web ? 'WebSearch' : '', ...(S.web ? ['--allowedTools', 'WebSearch'] : []),
+      ...(first ? ['--session-id', ccSession] : ['--resume', ccSession])];
+    // zonder API-sleutel in de omgeving, anders rekent Claude Code alsnog via de sleutel af
+    const env = { ...process.env }; delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN;
+    fs.mkdirSync(DATA, { recursive: true });
+    const child = spawn(CLAUDE_BIN, args, { cwd: DATA, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let aborted = false, errText = '', buf = '', resultError = null;
+    current = { abort() { aborted = true; child.kill(); } };
+    const out = sentenceStream(send);
+    child.stdout.on('data', d => {
+      buf += d;
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+        let o; try { o = JSON.parse(line); } catch (e) { continue; }
+        const ev = o.type === 'stream_event' && o.event;
+        if (ev && ev.type === 'content_block_start' && ev.content_block.type === 'tool_use') send({ type: 'status', status: 'SEARCHING' });
+        if (ev && ev.type === 'content_block_start' && ev.content_block.type === 'text') out.gap();
+        if (ev && ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') out.add(ev.delta.text);
+        if (o.type === 'result' && o.is_error) resultError = o.result || o.subtype || 'onbekende fout';
+      }
+    });
+    child.stderr.on('data', d => errText += d);
+    child.on('error', reject);
+    child.on('close', code => {
+      if (aborted && first) ccSession = null;
+      if (aborted) return reject(Object.assign(new Error('aborted'), { name: 'APIUserAbortError' }));
+      out.end();
+      if (code !== 0 || resultError) {
+        if (first) ccSession = null;
+        const msg = String(resultError || errText || `Claude Code stopte (code ${code})`).trim();
+        return reject(new Error(/log ?in|auth|login/i.test(msg) ? 'Claude Code is niet ingelogd. Open Terminal, typ claude en log in met je Claude-account.' : msg.slice(0, 300)));
+      }
+      resolve();
+    });
+  });
+}
+
+const chat = (userMsg, send) => BRAIN === 'abonnement' ? chatCode(userMsg, send) : chatApi(userMsg, send);
 
 /* =====================================================================
    HTTP
@@ -173,7 +241,7 @@ const server = http.createServer(async (req, res) => {
       const { text } = await readBody(req);
       res.writeHead(200, { 'content-type': 'application/x-ndjson', 'cache-control': 'no-cache' });
       const send = obj => res.write(JSON.stringify(obj) + '\n');
-      if (!claude) { send({ type: 'error', text: 'Geen ANTHROPIC_API_KEY gevonden. Zet hem in .env en start opnieuw.' }); return res.end(); }
+      if (!BRAIN) { send({ type: 'error', text: 'Claude is niet gevonden. Installeer Claude Code (zie README) of zet een ANTHROPIC_API_KEY in .env.' }); return res.end(); }
       if (current) current.abort();
       const userMsg = { role: 'user', content: String(text || '') };
       try { await chat(userMsg, send); }
@@ -185,7 +253,7 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
     if (url.pathname === '/api/stop' && req.method === 'POST') { if (current) current.abort(); return json(res, { ok: true }); }
-    if (url.pathname === '/api/reset' && req.method === 'POST') { if (current) current.abort(); history = []; return json(res, { ok: true }); }
+    if (url.pathname === '/api/reset' && req.method === 'POST') { if (current) current.abort(); history = []; ccSession = null; return json(res, { ok: true }); }
 
     // statische bestanden uit web/
     const file = path.normalize(path.join(WEB, url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname)));
@@ -201,6 +269,6 @@ const server = http.createServer(async (req, res) => {
 // alleen bereikbaar vanaf deze computer
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`JARVIS draait op http://localhost:${PORT}`);
-  if (!HAS_CLAUDE) console.log('Let op: geen ANTHROPIC_API_KEY in .env, Jarvis kan nog niet nadenken.');
+  console.log(BRAIN === 'abonnement' ? 'Brein: Claude Code met je Claude-abonnement.' : BRAIN === 'api' ? 'Brein: Anthropic API-sleutel.' : 'Let op: geen Claude gevonden, Jarvis kan nog niet nadenken.');
   if (!ELEVEN_KEY) console.log('Tip: zet ELEVENLABS_API_KEY in .env voor de Britse butlerstem.');
 });
