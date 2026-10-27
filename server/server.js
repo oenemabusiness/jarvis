@@ -39,7 +39,7 @@ const BRAIN = process.env.JARVIS_BRAIN === 'api' && HAS_KEY ? 'api' : CLAUDE_BIN
 const HAS_CLAUDE = !!BRAIN;
 
 /* ---- instellingen, bewaard in data/settings.json ---- */
-const DEFAULTS = { voice: 'Daniel', rate: 185, model: 'opus', name: 'JARVIS', user: 'sir',
+const DEFAULTS = { voice: 'Daniel', rate: 185, model: 'sonnet', name: 'JARVIS', user: 'sir',
   wake: true, web: true, gmail: false, wake_word: 'jarvis', lang: 'nl-NL' };
 const SETTINGS_FILE = path.join(DATA, 'settings.json');
 let S = { ...DEFAULTS };
