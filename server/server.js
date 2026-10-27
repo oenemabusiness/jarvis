@@ -40,7 +40,7 @@ const HAS_CLAUDE = !!BRAIN;
 
 /* ---- instellingen, bewaard in data/settings.json ---- */
 const DEFAULTS = { voice: 'Daniel', rate: 185, model: 'sonnet', name: 'JARVIS', user: 'sir',
-  wake: true, web: true, gmail: false, wake_word: 'jarvis', lang: 'nl-NL' };
+  wake: true, web: true, gmail: true, wake_word: 'jarvis', lang: 'nl-NL' };
 const SETTINGS_FILE = path.join(DATA, 'settings.json');
 let S = { ...DEFAULTS };
 try { S = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }; } catch (e) {}
@@ -162,6 +162,19 @@ async function chatApi(userMsg, send) {
 }
 
 /* ---- via Claude Code op de Mac (je Claude-abonnement) ---- */
+// Claude Code laadt zelf de koppelingen van je Claude-account (claude.ai/customize/connectors).
+// Lezen mag altijd; versturen, verwijderen en delen blijft dicht.
+const ACCOUNTS = ['Gmail', 'Google_Calendar', 'Google_Drive', 'Rylee', 'Jortt', 'Shopify', 'ClickUp', 'Canva'].map(n => `mcp__claude_ai_${n}`);
+const BLOCKED = [
+  'mcp__claude_ai_Gmail__send_message', 'mcp__claude_ai_Gmail__forward', 'mcp__claude_ai_Gmail__reply',
+  'mcp__claude_ai_Gmail__trash_message', 'mcp__claude_ai_Gmail__trash_thread', 'mcp__claude_ai_Gmail__delete_draft', 'mcp__claude_ai_Gmail__delete_label',
+  'mcp__claude_ai_Google_Calendar__delete_event', 'mcp__claude_ai_Google_Drive__trash_file', 'mcp__claude_ai_Google_Drive__share_file',
+  'mcp__claude_ai_Shopify__graphql_mutation',
+  // Jortt: niets verwijderen of naar klanten versturen
+  ...['Delete_Estimate', 'Delete_Invoice_by_ID', 'Delete_Project', 'Delete_Project_Line_item', 'Delete_a_Customer', 'Delete_a_Loonjournaalpost',
+    'Delete_an_Expense', 'Deregister_Payment', 'Send_Estimate', 'Send_Invoice', 'Send_direct_debit_authorization_to_a_Customer',
+    'Create_and_optionally_send_an_Invoice', 'Create_and_optionally_send_an_Estimate', 'Creates_and_optionally_sends_a_credit_Invoice'].map(t => `mcp__claude_ai_Jortt__${t}`),
+];
 let ccSession = null;   // gesprek dat Claude Code onthoudt tussen vragen
 function chatCode(userMsg, send) {
   return new Promise((resolve, reject) => {
@@ -169,8 +182,11 @@ function chatCode(userMsg, send) {
     if (first) ccSession = randomUUID();
     // korte herinnering per vraag: kleine modellen schieten anders mee in het Nederlands
     const args = ['-p', `${userMsg.content}\n\n(Reply in British English.)`, '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-      '--model', MODELS[S.model] ? S.model : 'sonnet', '--system-prompt', systemPrompt(), '--system-prompt-snapshot', 'off', '--strict-mcp-config',
-      '--tools', S.web ? 'WebSearch' : '', ...(S.web ? ['--allowedTools', 'WebSearch'] : []),
+      '--model', MODELS[S.model] ? S.model : 'sonnet', '--system-prompt', systemPrompt(), '--system-prompt-snapshot', 'off',
+      '--tools', S.web ? 'WebSearch' : '',
+      '--allowedTools', [...(S.web ? ['WebSearch'] : []), ...(S.gmail ? ACCOUNTS : [])].join(','),
+      '--disallowedTools', BLOCKED.join(','),
+      ...(S.gmail ? [] : ['--strict-mcp-config']),
       ...(first ? ['--session-id', ccSession] : ['--resume', ccSession])];
     // zonder API-sleutel in de omgeving, anders rekent Claude Code alsnog via de sleutel af
     const env = { ...process.env }; delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN;
@@ -186,7 +202,8 @@ function chatCode(userMsg, send) {
         const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
         let o; try { o = JSON.parse(line); } catch (e) { continue; }
         const ev = o.type === 'stream_event' && o.event;
-        if (ev && ev.type === 'content_block_start' && ev.content_block.type === 'tool_use') send({ type: 'status', status: 'SEARCHING' });
+        if (ev && ev.type === 'content_block_start' && ev.content_block.type === 'tool_use')
+          send({ type: 'status', status: ev.content_block.name.startsWith('mcp__') ? 'MAIL' : 'SEARCHING' });
         if (ev && ev.type === 'content_block_start' && ev.content_block.type === 'text') out.gap();
         if (ev && ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') out.add(ev.delta.text);
         if (o.type === 'result' && o.is_error) resultError = o.result || o.subtype || 'onbekende fout';

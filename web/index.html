@@ -102,7 +102,7 @@
   <label>Jouw naam <input type="text" id="s-user"></label>
   <label class="chk"><input type="checkbox" id="s-wake"> Altijd luisteren naar “Hé <span class="nm">Jarvis</span>”</label>
   <label class="chk"><input type="checkbox" id="s-web"> Mag op internet zoeken</label>
-  <label class="chk"><input type="checkbox" id="s-gmail"> Toegang tot Gmail (lezen + concepten)</label>
+  <label class="chk"><input type="checkbox" id="s-gmail"> Toegang tot je accounts (Gmail, Agenda, Bol.com…)</label>
   <div class="row"><button id="b-test">Test stem</button><button id="b-reset">Nieuw gesprek</button></div>
   <small>Britse stem: kies “Daniel” (gratis, macOS), of zet een ElevenLabs-sleutel in .env voor de echte butlerstem. Jarvis praat Engels en verstaat Nederlands.</small>
 </div>
@@ -126,7 +126,7 @@ const PILL = {
   LISTENING: ['listen', 'Ik luister: praat maar'],
   THINKING:  ['think', 'Even nadenken…'],
   SEARCHING: ['think', 'Zoeken op internet…'],
-  MAIL:      ['think', 'Mail doorzoeken…'],
+  MAIL:      ['think', 'Je accounts bekijken…'],
   SPEAKING:  ['speak', 'Aan het praten: spatie om te onderbreken'],
 };
 function refreshPill() {
@@ -174,7 +174,7 @@ function tick(now) {
 
   if (++tickFrame % 6 === 0) {
     const inten = level < 0.22 ? 'LAAG' : level < 0.5 ? 'MIDDEL' : 'HOOG';
-    const label = { OFFLINE: 'OFFLINE', STANDBY: 'STAND-BY', LISTENING: 'LUISTERT', THINKING: 'DENKT NA', SEARCHING: 'ZOEKT', MAIL: 'LEEST MAIL', SPEAKING: 'PRAAT' }[state] || state;
+    const label = { OFFLINE: 'OFFLINE', STANDBY: 'STAND-BY', LISTENING: 'LUISTERT', THINKING: 'DENKT NA', SEARCHING: 'ZOEKT', MAIL: 'BEKIJKT ACCOUNTS', SPEAKING: 'PRAAT' }[state] || state;
     $('status').textContent = `STATUS: ${label}  INTENSITEIT: ${inten}`;
   }
 }
