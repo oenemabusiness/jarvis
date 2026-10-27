@@ -206,10 +206,13 @@ function chatCode(userMsg, send) {
           send({ type: 'status', status: ev.content_block.name.startsWith('mcp__') ? 'MAIL' : 'SEARCHING' });
         if (ev && ev.type === 'content_block_start' && ev.content_block.type === 'text') out.gap();
         if (ev && ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') out.add(ev.delta.text);
+        // welke koppelingen en tools Claude Code geladen heeft, voor als er iets ontbreekt
+        if (o.type === 'system' && o.subtype === 'init') fs.writeFile(path.join(DATA, 'laatste-start.json'),
+          JSON.stringify({ tijd: new Date().toISOString(), model: o.model, mcp_servers: o.mcp_servers, tools: o.tools, args: args.filter(a => a.length < 300) }, null, 2), () => {});
         if (o.type === 'result' && o.is_error) resultError = o.result || o.subtype || 'onbekende fout';
       }
     });
-    child.stderr.on('data', d => errText += d);
+    child.stderr.on('data', d => { errText += d; fs.appendFile(path.join(DATA, 'claude-fouten.log'), d, () => {}); });
     child.on('error', reject);
     child.on('close', code => {
       if (aborted && first) ccSession = null;

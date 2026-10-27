@@ -25,5 +25,7 @@ elif ! grep -qE '^ANTHROPIC_API_KEY=.+' .env; then
 fi
 [ -d node_modules ] || npm install
 PORT=$(grep -E '^PORT=' .env | cut -d= -f2); PORT=${PORT:-8765}
+# draait er nog een oudere Jarvis? Stop die eerst, anders start de nieuwe versie niet
+OLD=$(lsof -ti tcp:"$PORT" 2>/dev/null); [ -n "$OLD" ] && { echo "Oude Jarvis gestopt."; kill $OLD; sleep 1; }
 ( sleep 1.5; open -a "Google Chrome" "http://localhost:$PORT" 2>/dev/null || open "http://localhost:$PORT" ) &
 node server/server.js
