@@ -26,27 +26,36 @@ Een spraakassistent in de browser, in de stijl van JARVIS uit Iron Man:
 
 - **Praten en luisteren**: wake word "Hé Jarvis" of spatie om te praten (Chrome-spraakherkenning, `nl-NL`), typen met `T`.
 - **Antwoorden**: de server stuurt zinnen terug die meteen worden uitgesproken, met meelopende ondertitels. Onderbreken kan met spatie.
-- **Brein**: Claude Code op de Mac, met keuze tussen Haiku, Sonnet en Opus.
-- **Extra's**: optioneel zoeken op internet en Gmail (lezen + concepten).
+- **Persoonlijkheid**: een Britse butler zoals JARVIS uit Iron Man. Hij praat Engels en verstaat Nederlands. Aanpassen kan in `server/prompts/jarvis.md`.
+- **Brein**: Claude via de Anthropic API, met keuze tussen Haiku, Sonnet en Opus.
+- **Stem**: ElevenLabs als er een sleutel in `.env` staat, anders de macOS-stem "Daniel" (Brits).
+- **Extra's**: optioneel zoeken op internet. Gmail en Agenda volgen in fase 3 van het plan.
 - **3D-avatar** met Three.js die reageert op luisteren, nadenken en praten.
+
+## Starten op de Mac
+
+1. Installeer [Node.js](https://nodejs.org) (LTS) als je dat nog niet hebt.
+2. Dubbelklik `start.command`. De eerste keer maakt hij een `.env`-bestand aan.
+3. Zet je `ANTHROPIC_API_KEY` in `.env` (en eventueel `ELEVENLABS_API_KEY`) en dubbelklik opnieuw.
+4. Chrome opent op `http://localhost:8765`. Klik om te starten en sta de microfoon toe.
+
+Sleutels staan alleen in `.env`, en dat bestand gaat nooit mee de repo in.
 
 ## Structuur
 
 ```
 jarvis/
 ├── README.md
+├── start.command          – start de server op de Mac (dubbelklikken)
+├── package.json
+├── .env.example           – voorbeeld voor je sleutels (kopie heet .env)
+├── server/
+│   ├── server.js          – /api/chat, /api/speak, /api/stop, /api/reset, /api/settings
+│   └── prompts/jarvis.md  – de persoonlijkheid van Jarvis
 └── web/
-    └── index.html     – interface (spraak, ondertitels, instellingen)
+    ├── index.html         – interface (spraak, ondertitels, instellingen)
+    └── avatar3d.js        – de 3D-avatar (Three.js via CDN)
 ```
-
-### Nog toe te voegen
-
-De interface verwijst naar bestanden die nog niet in de repo staan:
-
-- `web/avatar3d.js` – de 3D-avatar
-- `web/lib/three/` – Three.js (kan ook van een CDN komen)
-- de server met de endpoints `/api/chat`, `/api/speak`, `/api/stop`, `/api/reset` en `/api/settings`
-- `start.command` – start de server op de Mac
 
 ## Sneltoetsen
 

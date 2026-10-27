@@ -104,7 +104,7 @@
   <label class="chk"><input type="checkbox" id="s-web"> Mag op internet zoeken</label>
   <label class="chk"><input type="checkbox" id="s-gmail"> Toegang tot Gmail (lezen + concepten)</label>
   <div class="row"><button id="b-test">Test stem</button><button id="b-reset">Nieuw gesprek</button></div>
-  <small>Gratis betere stem: Systeeminstellingen → Toegankelijkheid → Gesproken materiaal → Systeemstem → Beheer stemmen → Nederlands → “Xander (Premium)”. Kies hem daarna hier.</small>
+  <small>Britse stem: kies “Daniel” (gratis, macOS), of zet een ElevenLabs-sleutel in .env voor de echte butlerstem. Jarvis praat Engels en verstaat Nederlands.</small>
 </div>
 <div id="typebox" class="ui"><input id="typed" placeholder="Typ een bericht voor JARVIS…" autocomplete="off"><button id="b-send">Stuur</button></div>
 <div id="hints" class="ui">Zeg <b>“Hé Jarvis”</b> · <b>Spatie</b>/klik: praten · <b>T</b>: typen · <b>H</b>: knoppen verbergen · <b>S</b>: instellingen</div>
@@ -392,7 +392,7 @@ async function loadSettings() {
   $('s-wake').checked = !!S.wake; $('s-web').checked = !!S.web; $('s-gmail').checked = !!S.gmail;
   document.querySelectorAll('.nm').forEach(e => e.textContent = S.name);
   refreshPill();
-  if (!r.claude) showError('Claude Code is niet gevonden op deze Mac.');
+  if (!r.claude) showError('Geen Claude-sleutel gevonden: zet ANTHROPIC_API_KEY in .env en start JARVIS opnieuw.');
 }
 async function saveSettings() {
   const body = { voice: $('s-voice').value, rate: +$('s-rate').value, model: $('s-model').value,
@@ -409,8 +409,8 @@ $('s-rate').addEventListener('input', () => $('s-rate-v').textContent = $('s-rat
 $('gear').onclick = e => { e.stopPropagation(); $('panel').classList.toggle('open'); };
 $('panel').onclick = e => e.stopPropagation();
 $('typebox').onclick = e => e.stopPropagation();
-$('b-test').onclick = () => { interrupt(); streamDone = true; enqueue(`Goed je te zien, ${S.user}. Zo klink ik.`); };
-$('b-reset').onclick = async () => { interrupt(); await fetch('/api/reset', { method: 'POST' }); setState('STANDBY'); enqueue('Geheugen gewist. We beginnen opnieuw.'); };
+$('b-test').onclick = () => { interrupt(); streamDone = true; enqueue(`At your service, ${S.user}. This is how I sound.`); };
+$('b-reset').onclick = async () => { interrupt(); await fetch('/api/reset', { method: 'POST' }); setState('STANDBY'); enqueue(`Memory cleared. A fresh start, ${S.user}.`); };
 $('b-send').onclick = () => { const v = $('typed').value; $('typed').value = ''; ask(v); };
 $('typed').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('b-send').click(); if (e.key === 'Escape') $('typebox').classList.remove('open'); });
 ['s-name', 's-user'].forEach(id => $(id).addEventListener('keydown', e => e.stopPropagation()));
@@ -431,9 +431,9 @@ $('boot').onclick = async () => {
   setupRecognition();
   setState('STANDBY');
   const h = new Date().getHours();
-  const part = h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond';
+  const part = h >= 5 && h < 12 ? 'Good morning' : h >= 12 && h < 18 ? 'Good afternoon' : 'Good evening';
   streamDone = true;
-  enqueue(`${part}, ${S.user}. Alle systemen zijn online.`);
+  enqueue(`${part}, ${S.user}. All systems are online.`);
 };
 
 // ?preview=SPEAKING (of LISTENING/THINKING) toont de avatar zonder opstartscherm — handig om te testen
