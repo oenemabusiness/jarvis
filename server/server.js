@@ -190,6 +190,8 @@ function chatCode(userMsg, send) {
       ...(first ? ['--session-id', ccSession] : ['--resume', ccSession])];
     // zonder API-sleutel in de omgeving, anders rekent Claude Code alsnog via de sleutel af
     const env = { ...process.env }; delete env.ANTHROPIC_API_KEY; delete env.ANTHROPIC_AUTH_TOKEN;
+    // wacht tot de claude.ai-koppelingen verbonden zijn, anders antwoordt -p zonder agenda- en mailtools
+    env.MCP_CONNECTION_NONBLOCKING = 'false';
     fs.mkdirSync(DATA, { recursive: true });
     const child = spawn(CLAUDE_BIN, args, { cwd: DATA, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let aborted = false, errText = '', buf = '', resultError = null;
