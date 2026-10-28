@@ -170,6 +170,8 @@ const BLOCKED = [
   'mcp__claude_ai_Gmail__trash_message', 'mcp__claude_ai_Gmail__trash_thread', 'mcp__claude_ai_Gmail__delete_draft', 'mcp__claude_ai_Gmail__delete_label',
   'mcp__claude_ai_Google_Calendar__delete_event', 'mcp__claude_ai_Google_Drive__trash_file', 'mcp__claude_ai_Google_Drive__share_file',
   'mcp__claude_ai_Shopify__graphql_mutation',
+  // ClickUp: niets verwijderen, samenvoegen of namens hem in chats posten
+  ...['delete_task', 'delete_comment', 'merge_tasks', 'remove_task_from_list', 'send_chat_message', 'update_chat_message'].map(t => `mcp__claude_ai_ClickUp__clickup_${t}`),
   // Jortt: niets verwijderen of naar klanten versturen
   ...['Delete_Estimate', 'Delete_Invoice_by_ID', 'Delete_Project', 'Delete_Project_Line_item', 'Delete_a_Customer', 'Delete_a_Loonjournaalpost',
     'Delete_an_Expense', 'Deregister_Payment', 'Send_Estimate', 'Send_Invoice', 'Send_direct_debit_authorization_to_a_Customer',
