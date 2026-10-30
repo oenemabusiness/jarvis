@@ -98,7 +98,7 @@ composer.addPass(new OutputPass());
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
-  renderer.setSize(w, h, false);
+  renderer.setSize(w, h);   // ook de CSS-maat, anders wordt het beeld op Retina-schermen dubbel zo groot
   composer.setSize(w, h);
   camera.aspect = w / h;
   // het geheel beslaat iets minder dan de helft van de schermhoogte; op smalle schermen verder weg

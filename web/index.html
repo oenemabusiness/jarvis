@@ -10,7 +10,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; color: #e6f1ff;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
-  canvas { position: fixed; inset: 0; display: block; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
 
   #status { position: fixed; right: 7%; top: 21%; font: 500 11px/1.6 "SF Mono", Menlo, monospace;
     letter-spacing: .22em; color: var(--cyan); opacity: .85; text-shadow: 0 0 8px #2a8cff; white-space: pre; }
@@ -449,6 +449,6 @@ if (previewSay) showUserText(previewSay);
 
 loadSettings().catch(() => showError('Kan de JARVIS-server niet bereiken. Start hem met start.command.'));
 </script>
-<script type="module" src="avatar3d.js?v=3"></script>
+<script type="module" src="avatar3d.js?v=4"></script>
 </body>
 </html>
