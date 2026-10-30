@@ -91,6 +91,11 @@
 <div id="panel" class="ui">
   <h3>JARVIS · SETTINGS</h3>
   <label>Stem <select id="s-voice"></select></label>
+  <label>ElevenLabs-stem
+    <select id="s-quality">
+      <option value="flash">Snel: vloeiend, half zoveel credits</option>
+      <option value="rijk">Rijk: de volste klank, trager</option>
+    </select></label>
   <label>Spreeksnelheid <span id="s-rate-v"></span><input type="range" id="s-rate" min="140" max="240" step="5"></label>
   <label>Brein
     <select id="s-model">
@@ -388,14 +393,14 @@ async function loadSettings() {
   sel.innerHTML = r.voices.map(v => `<option value="${v.name}">${v.name} (${v.lang})</option>`).join('');
   sel.value = S.voice;
   $('s-rate').value = S.rate; $('s-rate-v').textContent = S.rate;
-  $('s-model').value = S.model; $('s-name').value = S.name; $('s-user').value = S.user;
+  $('s-model').value = S.model; $('s-quality').value = S.quality; $('s-name').value = S.name; $('s-user').value = S.user;
   $('s-wake').checked = !!S.wake; $('s-web').checked = !!S.web; $('s-gmail').checked = !!S.gmail;
   document.querySelectorAll('.nm').forEach(e => e.textContent = S.name);
   refreshPill();
   if (!r.claude) showError('Geen Claude-sleutel gevonden: zet ANTHROPIC_API_KEY in .env en start JARVIS opnieuw.');
 }
 async function saveSettings() {
-  const body = { voice: $('s-voice').value, rate: +$('s-rate').value, model: $('s-model').value,
+  const body = { voice: $('s-voice').value, rate: +$('s-rate').value, model: $('s-model').value, quality: $('s-quality').value,
     name: $('s-name').value.trim() || 'JARVIS', user: $('s-user').value.trim() || 'Max',
     wake: $('s-wake').checked, web: $('s-web').checked, gmail: $('s-gmail').checked, wake_word: ($('s-name').value.trim() || 'jarvis').toLowerCase() };
   S = (await (await fetch('/api/settings', { method: 'POST', body: JSON.stringify(body) })).json()).settings;
@@ -404,7 +409,7 @@ async function saveSettings() {
   refreshPill();
   startOrStopRecognition();
 }
-['s-voice', 's-rate', 's-model', 's-name', 's-user', 's-wake', 's-web', 's-gmail'].forEach(id => $(id).addEventListener('change', saveSettings));
+['s-voice', 's-rate', 's-quality', 's-model', 's-name', 's-user', 's-wake', 's-web', 's-gmail'].forEach(id => $(id).addEventListener('change', saveSettings));
 $('s-rate').addEventListener('input', () => $('s-rate-v').textContent = $('s-rate').value);
 $('gear').onclick = e => { e.stopPropagation(); $('panel').classList.toggle('open'); };
 $('panel').onclick = e => e.stopPropagation();

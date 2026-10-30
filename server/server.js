@@ -39,7 +39,7 @@ const BRAIN = process.env.JARVIS_BRAIN === 'api' && HAS_KEY ? 'api' : CLAUDE_BIN
 const HAS_CLAUDE = !!BRAIN;
 
 /* ---- instellingen, bewaard in data/settings.json ---- */
-const DEFAULTS = { voice: 'Daniel', rate: 185, model: 'sonnet', name: 'JARVIS', user: 'sir',
+const DEFAULTS = { voice: 'Daniel', rate: 185, quality: 'flash', model: 'sonnet', name: 'JARVIS', user: 'sir',
   wake: true, web: true, gmail: true, wake_word: 'jarvis', lang: 'nl-NL' };
 const SETTINGS_FILE = path.join(DATA, 'settings.json');
 let S = { ...DEFAULTS };
@@ -82,7 +82,8 @@ async function speak(text) {
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${v.id}?output_format=mp3_44100_128`, {
       method: 'POST',
       headers: { 'xi-api-key': ELEVEN_KEY, 'content-type': 'application/json' },
-      body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2',
+      // flash: sneller en half zoveel credits; rijk: de volste klank
+      body: JSON.stringify({ text, model_id: S.quality === 'rijk' ? 'eleven_multilingual_v2' : 'eleven_flash_v2_5',
         voice_settings: { stability: 0.5, similarity_boost: 0.75, speed: Math.min(1.2, Math.max(0.7, S.rate / 185)) } }),
     });
     if (!r.ok) throw new Error(`ElevenLabs ${r.status}: ${(await r.text()).slice(0, 200)}`);
