@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JARVIS</title>
-<script type="importmap">{ "imports": { "three": "./lib/three/build/three.module.js", "three/addons/": "./lib/three/addons/" } }</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <style>
   :root { --cyan: #7cc4ff; --gold: #ffb347; --bg: #03060f; }
   * { box-sizing: border-box; }
@@ -449,6 +449,6 @@ if (previewSay) showUserText(previewSay);
 
 loadSettings().catch(() => showError('Kan de JARVIS-server niet bereiken. Start hem met start.command.'));
 </script>
-<script type="module" src="avatar3d.js?v=2"></script>
+<script type="module" src="avatar3d.js?v=3"></script>
 </body>
 </html>
