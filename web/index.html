@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JARVIS</title>
-<script type="importmap">{ "imports": { "three": "./lib/three/build/three.module.js", "three/addons/": "./lib/three/addons/" } }</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <style>
   :root { --cyan: #7cc4ff; --gold: #ffb347; --bg: #03060f; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; color: #e6f1ff;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
-  canvas { position: fixed; inset: 0; display: block; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
 
   #status { position: fixed; right: 7%; top: 21%; font: 500 11px/1.6 "SF Mono", Menlo, monospace;
     letter-spacing: .22em; color: var(--cyan); opacity: .85; text-shadow: 0 0 8px #2a8cff; white-space: pre; }
@@ -91,6 +91,11 @@
 <div id="panel" class="ui">
   <h3>JARVIS · SETTINGS</h3>
   <label>Stem <select id="s-voice"></select></label>
+  <label>ElevenLabs-stem
+    <select id="s-quality">
+      <option value="flash">Snel: vloeiend, half zoveel credits</option>
+      <option value="rijk">Rijk: de volste klank, trager</option>
+    </select></label>
   <label>Spreeksnelheid <span id="s-rate-v"></span><input type="range" id="s-rate" min="140" max="240" step="5"></label>
   <label>Brein
     <select id="s-model">
@@ -102,9 +107,9 @@
   <label>Jouw naam <input type="text" id="s-user"></label>
   <label class="chk"><input type="checkbox" id="s-wake"> Altijd luisteren naar “Hé <span class="nm">Jarvis</span>”</label>
   <label class="chk"><input type="checkbox" id="s-web"> Mag op internet zoeken</label>
-  <label class="chk"><input type="checkbox" id="s-gmail"> Toegang tot Gmail (lezen + concepten)</label>
+  <label class="chk"><input type="checkbox" id="s-gmail"> Toegang tot je accounts (Gmail, Agenda, Bol.com…)</label>
   <div class="row"><button id="b-test">Test stem</button><button id="b-reset">Nieuw gesprek</button></div>
-  <small>Gratis betere stem: Systeeminstellingen → Toegankelijkheid → Gesproken materiaal → Systeemstem → Beheer stemmen → Nederlands → “Xander (Premium)”. Kies hem daarna hier.</small>
+  <small>Britse stem: kies “Daniel” (gratis, macOS), of zet een ElevenLabs-sleutel in .env voor de echte butlerstem. Jarvis praat Engels en verstaat Nederlands.</small>
 </div>
 <div id="typebox" class="ui"><input id="typed" placeholder="Typ een bericht voor JARVIS…" autocomplete="off"><button id="b-send">Stuur</button></div>
 <div id="hints" class="ui">Zeg <b>“Hé Jarvis”</b> · <b>Spatie</b>/klik: praten · <b>T</b>: typen · <b>H</b>: knoppen verbergen · <b>S</b>: instellingen</div>
@@ -126,7 +131,7 @@ const PILL = {
   LISTENING: ['listen', 'Ik luister: praat maar'],
   THINKING:  ['think', 'Even nadenken…'],
   SEARCHING: ['think', 'Zoeken op internet…'],
-  MAIL:      ['think', 'Mail doorzoeken…'],
+  MAIL:      ['think', 'Je accounts bekijken…'],
   SPEAKING:  ['speak', 'Aan het praten: spatie om te onderbreken'],
 };
 function refreshPill() {
@@ -174,7 +179,7 @@ function tick(now) {
 
   if (++tickFrame % 6 === 0) {
     const inten = level < 0.22 ? 'LAAG' : level < 0.5 ? 'MIDDEL' : 'HOOG';
-    const label = { OFFLINE: 'OFFLINE', STANDBY: 'STAND-BY', LISTENING: 'LUISTERT', THINKING: 'DENKT NA', SEARCHING: 'ZOEKT', MAIL: 'LEEST MAIL', SPEAKING: 'PRAAT' }[state] || state;
+    const label = { OFFLINE: 'OFFLINE', STANDBY: 'STAND-BY', LISTENING: 'LUISTERT', THINKING: 'DENKT NA', SEARCHING: 'ZOEKT', MAIL: 'BEKIJKT ACCOUNTS', SPEAKING: 'PRAAT' }[state] || state;
     $('status').textContent = `STATUS: ${label}  INTENSITEIT: ${inten}`;
   }
 }
@@ -388,14 +393,14 @@ async function loadSettings() {
   sel.innerHTML = r.voices.map(v => `<option value="${v.name}">${v.name} (${v.lang})</option>`).join('');
   sel.value = S.voice;
   $('s-rate').value = S.rate; $('s-rate-v').textContent = S.rate;
-  $('s-model').value = S.model; $('s-name').value = S.name; $('s-user').value = S.user;
+  $('s-model').value = S.model; $('s-quality').value = S.quality; $('s-name').value = S.name; $('s-user').value = S.user;
   $('s-wake').checked = !!S.wake; $('s-web').checked = !!S.web; $('s-gmail').checked = !!S.gmail;
   document.querySelectorAll('.nm').forEach(e => e.textContent = S.name);
   refreshPill();
-  if (!r.claude) showError('Claude Code is niet gevonden op deze Mac.');
+  if (!r.claude) showError('Geen Claude-sleutel gevonden: zet ANTHROPIC_API_KEY in .env en start JARVIS opnieuw.');
 }
 async function saveSettings() {
-  const body = { voice: $('s-voice').value, rate: +$('s-rate').value, model: $('s-model').value,
+  const body = { voice: $('s-voice').value, rate: +$('s-rate').value, model: $('s-model').value, quality: $('s-quality').value,
     name: $('s-name').value.trim() || 'JARVIS', user: $('s-user').value.trim() || 'Max',
     wake: $('s-wake').checked, web: $('s-web').checked, gmail: $('s-gmail').checked, wake_word: ($('s-name').value.trim() || 'jarvis').toLowerCase() };
   S = (await (await fetch('/api/settings', { method: 'POST', body: JSON.stringify(body) })).json()).settings;
@@ -404,13 +409,13 @@ async function saveSettings() {
   refreshPill();
   startOrStopRecognition();
 }
-['s-voice', 's-rate', 's-model', 's-name', 's-user', 's-wake', 's-web', 's-gmail'].forEach(id => $(id).addEventListener('change', saveSettings));
+['s-voice', 's-rate', 's-quality', 's-model', 's-name', 's-user', 's-wake', 's-web', 's-gmail'].forEach(id => $(id).addEventListener('change', saveSettings));
 $('s-rate').addEventListener('input', () => $('s-rate-v').textContent = $('s-rate').value);
 $('gear').onclick = e => { e.stopPropagation(); $('panel').classList.toggle('open'); };
 $('panel').onclick = e => e.stopPropagation();
 $('typebox').onclick = e => e.stopPropagation();
-$('b-test').onclick = () => { interrupt(); streamDone = true; enqueue(`Goed je te zien, ${S.user}. Zo klink ik.`); };
-$('b-reset').onclick = async () => { interrupt(); await fetch('/api/reset', { method: 'POST' }); setState('STANDBY'); enqueue('Geheugen gewist. We beginnen opnieuw.'); };
+$('b-test').onclick = () => { interrupt(); streamDone = true; enqueue(`At your service, ${S.user}. This is how I sound.`); };
+$('b-reset').onclick = async () => { interrupt(); await fetch('/api/reset', { method: 'POST' }); setState('STANDBY'); enqueue(`Memory cleared. A fresh start, ${S.user}.`); };
 $('b-send').onclick = () => { const v = $('typed').value; $('typed').value = ''; ask(v); };
 $('typed').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('b-send').click(); if (e.key === 'Escape') $('typebox').classList.remove('open'); });
 ['s-name', 's-user'].forEach(id => $(id).addEventListener('keydown', e => e.stopPropagation()));
@@ -431,9 +436,9 @@ $('boot').onclick = async () => {
   setupRecognition();
   setState('STANDBY');
   const h = new Date().getHours();
-  const part = h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond';
+  const part = h >= 5 && h < 12 ? 'Good morning' : h >= 12 && h < 18 ? 'Good afternoon' : 'Good evening';
   streamDone = true;
-  enqueue(`${part}, ${S.user}. Alle systemen zijn online.`);
+  enqueue(`${part}, ${S.user}. All systems are online.`);
 };
 
 // ?preview=SPEAKING (of LISTENING/THINKING) toont de avatar zonder opstartscherm — handig om te testen
@@ -444,6 +449,6 @@ if (previewSay) showUserText(previewSay);
 
 loadSettings().catch(() => showError('Kan de JARVIS-server niet bereiken. Start hem met start.command.'));
 </script>
-<script type="module" src="avatar3d.js?v=2"></script>
+<script type="module" src="avatar3d.js?v=4"></script>
 </body>
 </html>
